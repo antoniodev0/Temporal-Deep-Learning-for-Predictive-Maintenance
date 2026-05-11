@@ -221,6 +221,79 @@ Stesso flusso del notebook LSTM, con il Transformer (d_model=64, 4 head, ff_dim=
 
 ---
 
+## Grafici e Analisi Visiva
+
+### `plots/01_lifecycle_distribution.png` — Distribuzione del ciclo di vita dei motori
+
+![Lifecycle distribution](plots/01_lifecycle_distribution.png)
+
+Il grafico mostra, per ciascuno dei 4 sotto-dataset, l'istogramma del numero massimo di cicli operativi raggiunti da ogni motore prima del guasto.
+
+**Osservazioni:**
+- **FD001 e FD002** presentano distribuzioni più concentrate e simmetriche, con un picco attorno a 175–200 cicli e una coda destra che arriva fino a ~350–375 cicli.
+- **FD003 e FD004** hanno distribuzioni molto più disperse, con motori che arrivano fino a 500+ cicli. La coda destra è marcata, segno che alcuni motori durano quasi il doppio della media. Questo rende la predizione della RUL più difficile: la variabilità inter-motore è molto alta.
+- Il cap a 125 cicli applicato alla RUL è giustificato dal fatto che la maggior parte dei motori ha una fase "sana" iniziale ben superiore ai 125 cicli, durante la quale il degrado non è ancora rilevabile dai sensori.
+
+---
+
+### `plots/01_sensor_trends.png` — Andamento dei sensori nel tempo (Motore 1, FD001)
+
+![Sensor trends](plots/01_sensor_trends.png)
+
+Il grafico mostra l'evoluzione nel tempo dei 14 sensori mantenuti e delle 3 impostazioni operative per un singolo motore di FD001 (~200 cicli di vita).
+
+**Osservazioni:**
+- **setting1 e setting2** appaiono come segnali rumorosi senza trend visibile: rappresentano le condizioni di volo che variano ad ogni ciclo indipendentemente dallo stato del motore. In FD001 (1 sola condizione operativa) la varianza è molto ridotta.
+- **setting3** è pressoché costante a ~100: non porta informazione sul degrado ma viene mantenuto perché utile per la normalizzazione cluster-based di FD002/FD004.
+- **s2, s3, s4** mostrano un chiaro trend crescente verso fine vita: sono i sensori più informativi per il degrado.
+- **s11** mostra un pattern complesso: decresce nella fase iniziale per poi stabilizzarsi, con un cambio di regime nel mezzo della vita utile.
+- **s12 e s13** mostrano trend opposti (uno crescente, l'altro decrescente), coerentemente con la fisica del motore (pressione/temperatura che aumentano mentre il rendimento diminuisce).
+- **s7, s8, s15** sono prevalentemente rumorosi con trend deboli: contribuiscono marginalmente ma vengono mantenuti perché la loro rimozione peggiora le prestazioni in letteratura.
+
+Questo grafico motiva la scelta di una finestra temporale (window_size=30): un singolo timestep non contiene abbastanza informazione sul trend, ma una finestra di 30 cicli cattura già i pattern di degrado più significativi.
+
+---
+
+### `plots/03_lstm_training_curves.png` — Curve di training LSTM
+
+![LSTM training curves](plots/03_lstm_training_curves.png)
+
+Le curve mostrano l'evoluzione della MSE Loss su train (blu) e validation (arancione) per i 4 dataset.
+
+**Osservazioni:**
+- Tutte e 4 le curve presentano una caratteristica struttura **a gradino**: un primo plateau attorno a epoch 5–10, seguito da una discesa brusca (intorno a epoch 25–30 per FD001/FD003, prima per FD002/FD004). Questo è tipico delle LSTM: la rete prima apprende le statistiche di base del segnale, poi "scopre" la struttura temporale del degrado.
+- **Train e validation si sovrappongono quasi perfettamente** per tutti i dataset: nessun overfitting. L'EarlyStopping con patience=15 ha interrotto il training nel momento giusto.
+- **FD001 e FD003** (mono-condizione) richiedono più epoche (~85–90) rispetto a **FD002 e FD004** (~45–75). Paradossalmente i dataset più complessi convergono prima in termini di epoche, perché il maggior numero di campioni (46k e 54k vs 17k e 21k) velocizza l'aggiornamento dei pesi.
+- I valori finali di val_loss sono coerenti con i RMSE riportati nella tabella dei risultati (val_loss ≈ RMSE²).
+
+---
+
+### `plots/04_transformer_training_curves.png` — Curve di training Transformer
+
+![Transformer training curves](plots/04_transformer_training_curves.png)
+
+**Osservazioni:**
+- Il Transformer converge **molto più rapidamente** dell'LSTM: tutti i dataset raggiungono la zona di plateau entro le prime 5–10 epoche, senza il gradino a due stadi caratteristico dell'LSTM. Il meccanismo di attention permette di catturare immediatamente le dipendenze a lungo raggio nella finestra.
+- **FD001, FD002, FD003**: le curve train/val sono allineate e lisce, con EarlyStopping che interviene tra epoch 36 e 52.
+- **FD004**: si osserva una leggera oscillazione nella fase finale (epoch 30–40) con un piccolo divario tra train e val. Questo è il segnale di una lieve instabilità su questo dataset, il più complesso (6 condizioni + 2 modi di guasto). Il Transformer fatica a generalizzare su distribuzioni non stazionarie, come confermato dall'RMSE finale di 39.4 contro i 28.7 dell'LSTM.
+- Il Transformer converge in **meno epoche totali** ma con **loss finale più alta su FD004**, evidenziando un trade-off tra velocità di convergenza e qualità della soluzione trovata.
+
+---
+
+### `plots/05_scatter_pred_vs_true.png` — Predetto vs Reale (scatter plot)
+
+![Scatter predicted vs true](plots/05_scatter_pred_vs_true.png)
+
+Ogni punto rappresenta un motore del test set. L'asse X è la RUL reale (da `RUL_FDxxx.txt`), l'asse Y è la RUL predetta dal modello. La linea rossa tratteggiata è la bisettrice perfetta (predizione = realtà).
+
+**Osservazioni:**
+- **LSTM su FD001 e FD003**: i punti sono ben allineati alla diagonale, con dispersione ridotta. Il modello è sia accurato sia calibrato: non tende sistematicamente a sovra- o sottostimare.
+- **LSTM su FD002 e FD004**: maggiore dispersione attorno alla diagonale, coerente con l'RMSE più alto. La distribuzione degli errori appare comunque bilanciata: errori precoci e tardivi sono presenti in misura simile.
+- **Transformer su FD001, FD002, FD003**: scatter simile all'LSTM, con punti distribuiti attorno alla diagonale senza bias evidenti.
+- **Transformer su FD004**: il grafico è chiaramente peggiore degli altri. Si notano diversi punti con RUL reale bassa (0–50 cicli) ma RUL predetta alta (80–120 cicli) — esattamente le predizioni tardive che il NASA Score penalizza in modo esponenziale. Questo spiega il NASA Score di 2.369.435 (contro 7.771 dell'LSTM): un numero relativamente piccolo di predizioni gravemente tardive domina il risultato.
+
+---
+
 ## Architetture dei Modelli
 
 ### LSTM
