@@ -1,0 +1,28 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+
+# Data (download manually)
+data/raw/*.txt
+data/processed/*.npy
+
+# Models
+saved_models/*.keras
+saved_models/*.h5
+
+# Results
+experiments/results/*.csv
+
+# Plots
+plots/*.png
+plots/*.pdf
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/

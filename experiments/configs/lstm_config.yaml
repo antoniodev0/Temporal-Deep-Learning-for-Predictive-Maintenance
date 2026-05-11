@@ -1,0 +1,21 @@
+model: lstm
+
+# Architecture
+units: 128
+dropout: 0.2
+
+# Training
+learning_rate: 0.001
+epochs: 200
+batch_size: 256
+validation_split: 0.2
+patience: 15
+
+# Data
+window_size: 30
+
+# Tuning search space
+search:
+  units: [64, 128, 256]
+  dropout: [0.1, 0.2, 0.3]
+  window_size: [20, 30, 40, 50]

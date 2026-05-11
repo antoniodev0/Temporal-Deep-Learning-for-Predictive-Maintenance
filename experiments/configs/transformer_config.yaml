@@ -1,0 +1,27 @@
+model: transformer
+
+# Architecture
+d_model: 64
+num_heads: 4
+ff_dim: 128
+num_blocks: 2
+dropout: 0.1
+
+# Training
+learning_rate: 0.001
+epochs: 200
+batch_size: 256
+validation_split: 0.2
+patience: 15
+
+# Data
+window_size: 30
+
+# Tuning search space
+search:
+  d_model: [32, 64, 128]
+  num_heads: [2, 4]
+  ff_dim: [64, 128]
+  num_blocks: [1, 2, 3]
+  dropout: [0.1, 0.2]
+  window_size: [20, 30, 40, 50]
