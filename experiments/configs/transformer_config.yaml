@@ -1,27 +1,27 @@
 model: transformer
 
-# Architecture
-d_model: 64
-num_heads: 4
-ff_dim: 128
-num_blocks: 2
-dropout: 0.1
+# Architettura
+d_model: 64     # dimensione dell'embedding interno; tutti i layer operano in questo spazio
+num_heads: 4    # teste di attention parallele; ogni head vede uno spazio di dim d_model//num_heads = 16
+ff_dim: 128     # dimensione della FFN interna = 2× d_model (standard "Attention is All You Need")
+num_blocks: 2   # blocchi encoder impilati; 2 è sufficiente per sequenze corte (30 timestep)
+dropout: 0.1    # dropout più basso rispetto all'LSTM: il Transformer è già regolarizzato da LayerNorm
 
 # Training
-learning_rate: 0.001
-epochs: 200
-batch_size: 256
-validation_split: 0.2
-patience: 15
+learning_rate: 0.001  # lr iniziale per Adam; identico all'LSTM per confronto fair
+epochs: 200           # massimo teorico: il Transformer converge in genere più velocemente dell'LSTM
+batch_size: 256       # stesso batch dell'LSTM → aggiornamenti del gradiente comparabili
+validation_split: 0.2 # 80% train, 20% validazione
+patience: 15          # epoche senza miglioramento prima di EarlyStopping
 
-# Data
-window_size: 30
+# Dati
+window_size: 30       # stessa finestra dell'LSTM → l'unica variabile è l'architettura
 
-# Tuning search space
+# Spazio di ricerca per il tuning degli iperparametri (Esperimento 2 — ablation)
 search:
-  d_model: [32, 64, 128]
-  num_heads: [2, 4]
-  ff_dim: [64, 128]
-  num_blocks: [1, 2, 3]
-  dropout: [0.1, 0.2]
-  window_size: [20, 30, 40, 50]
+  d_model: [32, 64, 128]         # embedding più grande = più capacità, ma più parametri
+  num_heads: [2, 4]              # num_heads deve dividere d_model esattamente
+  ff_dim: [64, 128]              # dimensione FFN: tipicamente 1–2× d_model
+  num_blocks: [1, 2, 3]         # profondità: più blocchi = più astrazione, rischio overfitting
+  dropout: [0.1, 0.2]           # regularizzazione; valori bassi perché LayerNorm già stabilizza
+  window_size: [20, 30, 40, 50] # contesto temporale: il Transformer usa attention globale su tutta la finestra

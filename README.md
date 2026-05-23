@@ -89,7 +89,17 @@ def load_raw(path):
 
 **Feature finali**: 14 sensori (`s2, s3, s4, s7, s8, s9, s11, s12, s13, s14, s15, s17, s20, s21`) + 3 impostazioni operative = **17 feature totali** → dimensione dell'input `(window_size, 17)`.
 
-Per FD002 e FD004 (più condizioni operative) si applica la **normalizzazione cluster-based**: le condizioni operative vengono clusterizzate con KMeans (k=6) e la normalizzazione MinMax viene applicata separatamente per ogni cluster.
+### Normalizzazione cluster-based (FD002 e FD004)
+
+In FD002 e FD004 i motori operano in 6 condizioni di volo diverse. Lo stesso sensore ha range di valori completamente diversi a seconda del regime: ad esempio la temperatura di scarico è 800–850°C a quota bassa e 600–650°C a quota alta. Applicare un MinMax globale confonde i regimi: un valore "normale" in un regime e uno "anomalo" in un altro ricevono la stessa scala, rendendo i segnali incomparabili.
+
+**Soluzione in tre passi** (implementata in `normalize_clustered` in `src/preprocessing.py`):
+
+1. **KMeans(k=6)** sui 3 settings (quota, Mach, throttle) identifica i 6 regimi operativi e assegna ogni riga a un cluster
+2. Per ogni cluster si calcola un **MinMax separato**, fittato solo sui dati di quel regime nel train set
+3. Ogni sensore viene scalato in [0, 1] **relativamente al suo regime** — un valore diventa alto o basso rispetto agli altri valori dello stesso contesto operativo
+
+Il clustering avviene sul train set e i centroidi vengono usati anche per assegnare il test set al cluster corretto (nessun leakage). In FD001/FD003 (1 solo regime) questo problema non esiste e si usa il MinMax globale standard.
 
 ---
 

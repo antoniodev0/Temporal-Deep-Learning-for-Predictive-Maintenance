@@ -1,21 +1,21 @@
 model: lstm
 
-# Architecture
-units: 128
-dropout: 0.2
+# Architettura
+units: 128          # neuroni nel primo layer LSTM; il secondo ha units//2 = 64
+dropout: 0.2        # probabilità di dropout dopo ogni LSTM → regularizzazione contro l'overfitting
 
 # Training
-learning_rate: 0.001
-epochs: 200
-batch_size: 256
-validation_split: 0.2
-patience: 15
+learning_rate: 0.001  # lr iniziale per Adam; ReduceLROnPlateau lo abbassa automaticamente
+epochs: 200           # massimo teorico: EarlyStopping ferma prima (tipicamente 45–90 epoche)
+batch_size: 256       # buon trade-off tra velocità di aggiornamento e stabilità del gradiente
+validation_split: 0.2 # 80% train, 20% validazione (split implicito sugli ultimi campioni)
+patience: 15          # epoche senza miglioramento prima di EarlyStopping
 
-# Data
-window_size: 30
+# Dati
+window_size: 30       # finestra temporale: 30 cicli di contesto per ogni predizione RUL
 
-# Tuning search space
+# Spazio di ricerca per il tuning degli iperparametri (Esperimento 2 — ablation)
 search:
-  units: [64, 128, 256]
-  dropout: [0.1, 0.2, 0.3]
-  window_size: [20, 30, 40, 50]
+  units: [64, 128, 256]          # capacità della rete: più unità = più parametri
+  dropout: [0.1, 0.2, 0.3]       # trade-off regularizzazione vs underfitting
+  window_size: [20, 30, 40, 50]  # contesto temporale: più lungo = più storia, più parametri
