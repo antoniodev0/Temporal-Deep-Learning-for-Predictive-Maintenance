@@ -46,14 +46,48 @@ Il dataset simula il degrado di motori turboventola fino al guasto. Contiene 4 s
 
 Ogni file contiene 26 colonne: ID motore, ciclo operativo, 3 impostazioni operative e 21 sensori. Le ultime 2 colonne (sempre NaN) vengono scartate.
 
+### Impostazioni operative (setting1, setting2, setting3)
+
+Le tre impostazioni operative descrivono le **condizioni di volo** del motore in ogni ciclo:
+
+| Colonna | Grandezza fisica |
+|---------|-----------------|
+| setting1 | Quota di volo (ft) |
+| setting2 | Numero di Mach |
+| setting3 | Angolo del throttle (TRA, %) |
+
+In **FD001 e FD003** (1 condizione operativa) questi valori sono quasi costanti ad ogni ciclo — il motore opera sempre nello stesso regime di volo. In **FD002 e FD004** (6 condizioni operative) variano tra i cicli perché la simulazione alterna 6 profili di volo diversi. Questa variabilità è la ragione per cui in FD002/FD004 è necessaria la normalizzazione cluster-based: lo stesso sensore ha range di valori molto diversi a seconda della quota e della velocità.
+
 ### Strategia di etichettatura RUL
 
 Si adotta la **RUL lineare a tratti** (piecewise linear / clipped): la RUL massima viene cappata a 125 cicli, assumendo che il motore sia in stato sano nella prima parte della sua vita. Questo è lo standard della letteratura e migliora significativamente le prestazioni.
 
 ### Selezione delle feature
 
-I sensori costanti o quasi-costanti vengono rimossi: `s1, s5, s6, s10, s16, s18, s19`.
-Rimangono 14 sensori (`s2, s3, s4, s7, s8, s9, s11, s12, s13, s14, s15, s17, s20, s21`) più le 3 impostazioni operative.
+La selezione è stata fatta in due fasi:
+
+**1. Analisi della varianza (notebook `01_eda.ipynb`)**
+Nel notebook EDA viene calcolata la varianza di ogni sensore su FD001 e visualizzata in ordine crescente. I sensori con varianza **esattamente zero o trascurabile** sono quelli che non cambiano mai — né tra cicli, né tra motori diversi. La selezione finale segue lo standard della letteratura (Zheng et al., 2017), che identifica 7 sensori da rimuovere:
+
+```
+s1=0.0, s5=0.0, s6=0.0, s10=0.0, s16=0.0, s18=0.0, s19=0.0  → rimossi
+```
+
+**Nota importante**: altri sensori come `s8`, `s13`, `s15` hanno varianza molto bassa ma **non vengono rimossi** perché mostrano comunque un trend correlato al degrado (varianza piccola ≠ segnale inutile). La soglia non è un criterio automatico: la selezione finale rispecchia la scelta consolidata in letteratura, confermata visivamente nell'analisi dei trend.
+
+**2. Rimozione automatica al caricamento (`src/preprocessing.py`, funzione `load_raw`)**
+Una volta identificati nell'EDA, i sensori da rimuovere vengono definiti come costante `DROP_SENSORS` e rimossi automaticamente ad ogni caricamento del dataset, **prima di qualsiasi altra elaborazione**:
+
+```python
+DROP_SENSORS = ["s1", "s5", "s6", "s10", "s16", "s18", "s19"]
+
+def load_raw(path):
+    df = pd.read_csv(path, sep=r"\s+", header=None, names=COLUMNS)
+    df.drop(columns=DROP_SENSORS, inplace=True)  # ← qui avviene la rimozione
+    return df
+```
+
+**Feature finali**: 14 sensori (`s2, s3, s4, s7, s8, s9, s11, s12, s13, s14, s15, s17, s20, s21`) + 3 impostazioni operative = **17 feature totali** → dimensione dell'input `(window_size, 17)`.
 
 Per FD002 e FD004 (più condizioni operative) si applica la **normalizzazione cluster-based**: le condizioni operative vengono clusterizzate con KMeans (k=6) e la normalizzazione MinMax viene applicata separatamente per ogni cluster.
 
