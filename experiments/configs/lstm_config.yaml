@@ -14,7 +14,7 @@ patience: 15          # epoche senza miglioramento prima di EarlyStopping
 # Dati
 window_size: 30       # finestra temporale: 30 cicli di contesto per ogni predizione RUL
 
-# Spazio di ricerca per il tuning degli iperparametri (Esperimento 2 — ablation)
+# Spazio di ricerca per il tuning degli iperparametri
 search:
   units: [64, 128, 256]          # capacità della rete: più unità = più parametri
   dropout: [0.1, 0.2, 0.3]       # trade-off regularizzazione vs underfitting
