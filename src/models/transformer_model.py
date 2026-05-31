@@ -45,8 +45,12 @@ class TransformerEncoderBlock(keras.layers.Layer):
 
     def __init__(self, d_model: int, num_heads: int, ff_dim: int, dropout: float = 0.1, **kwargs):
         super().__init__(**kwargs)
-        # key_dim = d_model // num_heads → ogni head opera in uno spazio ridotto,
-        # poi i contributi di tutti gli head vengono concatenati → d_model totale
+        # Multi-head attention: invece di un'unica attention su d_model dimensioni,
+        # si eseguono num_heads attention parallele ciascuna su uno spazio ridotto
+        # (key_dim = d_model // num_heads). Con i valori di default: 4 teste × 16 dim = 64.
+        # Ogni testa può specializzarsi su un tipo diverso di relazione temporale
+        # (es. dipendenze a breve termine, correlazioni a lungo raggio, pattern periodici).
+        # I 4 output da 16 dim vengono concatenati → vettore da 64, stessa dim di input.
         self.attn = keras.layers.MultiHeadAttention(num_heads=num_heads, key_dim=d_model // num_heads)
         # FFN: espansione → ff_dim (con ReLU), poi riduzione → d_model
         # L'espansione permette di catturare interazioni non lineari tra le feature
@@ -107,6 +111,8 @@ def build_transformer(
     # rispetto a usare solo l'ultimo token (come farebbe un LSTM), perché sfrutta
     # l'intera sequenza per la predizione finale
     x = keras.layers.GlobalAveragePooling1D()(x)
+    # ReLU introduce non-linearità: senza attivazione, layer densi in sequenza
+    # collasserebbero in una sola trasformazione lineare, incapace di modellare il degrado
     x = keras.layers.Dense(64, activation="relu")(x)
     x = keras.layers.Dropout(dropout)(x)  # regularizzazione aggiuntiva prima dell'output
     # Uscita lineare: regressione RUL, nessuna attivazione

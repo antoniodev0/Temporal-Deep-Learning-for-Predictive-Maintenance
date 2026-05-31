@@ -14,6 +14,7 @@
 - [Descrizione dei File Sorgente](#descrizione-dei-file-sorgente)
 - [Descrizione dei Notebook](#descrizione-dei-notebook)
 - [Architetture dei Modelli](#architetture-dei-modelli)
+- [Ottimizzazione e Training](#ottimizzazione-e-training)
 - [Metriche di Valutazione](#metriche-di-valutazione)
 - [Risultati](#risultati)
 - [Analisi e Conclusioni](#analisi-e-conclusioni)
@@ -358,6 +359,9 @@ Dense(64, relu)
 Dense(1, linear)  ← predizione RUL
 ```
 
+**Perché ReLU nel layer Dense intermedio?**
+ReLU (Rectified Linear Unit) è la funzione di attivazione definita come `f(x) = max(0, x)`: lascia invariati i valori positivi e azzera quelli negativi. Inserirla nel `Dense(64)` intermedio introduce **non-linearità** nella rete: senza attivazione, qualsiasi sequenza di layer densi collasserebbe in un'unica trasformazione lineare, incapace di modellare i pattern complessi del degrado. ReLU è scelta per la sua semplicità computazionale e perché non soffre del problema del gradiente che svanisce (vanishing gradient) tipico di sigmoid e tanh. L'ultimo layer `Dense(1, linear)` non ha invece attivazione: essendo una regressione, la RUL può assumere qualsiasi valore positivo e non va vincolata. La stessa struttura — ReLU nel Dense intermedio, lineare nell'output — viene usata anche nel Transformer.
+
 ### Transformer
 
 ```
@@ -378,6 +382,57 @@ Dropout(0.1)
     │
 Dense(1, linear)  ← predizione RUL
 ```
+
+**Multi-Head Attention — perché?**
+Un meccanismo di attention singolo impara un solo tipo di relazione tra i timestep. La **multi-head attention** esegue invece più attention in parallelo, ciascuna in uno spazio rappresentativo diverso: una testa può catturare dipendenze a breve termine (cicli vicini), un'altra correlazioni a lungo raggio, un'altra ancora pattern periodici legati alle condizioni operative. I risultati di tutte le teste vengono poi concatenati e riproiettati nella dimensione originale.
+
+**Cosa significano `num_heads=4` e `d_model=64`?**
+`d_model=64` è la dimensione dello spazio in cui opera il Transformer: ogni timestep viene rappresentato come un vettore di 64 numeri. Con `num_heads=4`, questo spazio viene **diviso in 4 sottospazi da 16 dimensioni** ciascuno (`key_dim = d_model // num_heads = 64 // 4 = 16`). Ogni testa esegue la propria attention su 16 dimensioni in modo indipendente, poi i 4 output vengono riconcatenati in un vettore da 64. In codice:
+
+```python
+self.attn = keras.layers.MultiHeadAttention(num_heads=4, key_dim=16)  # 4 × 16 = 64
+```
+
+Il modello ha così **4 prospettive indipendenti** sulle stesse 64 dimensioni, senza aumentare il costo computazionale rispetto a una singola attention da 64.
+
+---
+
+## Ottimizzazione e Training
+
+### Ottimizzatore: Adam
+
+Entrambi i modelli vengono compilati con **Adam** come ottimizzatore, in `model.compile()`:
+
+```python
+model.compile(
+    optimizer=keras.optimizers.Adam(learning_rate=learning_rate),  # lr=1e-3 iniziale
+    loss="mse",
+    metrics=["mae"],
+)
+```
+
+Questa chiamata si trova in `src/models/lstm_model.py` (funzione `build_lstm`) e, in modo identico, in `src/models/transformer_model.py` (funzione `build_transformer`). Il learning rate iniziale `1e-3` è definito in entrambi i file di configurazione:
+
+- `experiments/configs/lstm_config.yaml` → `learning_rate: 0.001`
+- `experiments/configs/transformer_config.yaml` → `learning_rate: 0.001`
+
+Il valore è **volutamente identico** tra LSTM e Transformer: il learning rate è una variabile sperimentale che teniamo costante per garantire un confronto equo tra le due architetture.
+
+> **Nota sulla notazione:** `1e-3` è notazione scientifica per 0,001 (1 × 10⁻³), mentre `1e-6` usato sotto come soglia minima vale 0,000001 (1 × 10⁻⁶). In pratica il learning rate parte da 0,001 e può essere ridotto automaticamente fino a 0,000001 — un range di tre ordini di grandezza.
+
+**Perché Adam?** Adam combina i vantaggi di momentum (media mobile dei gradienti passati) e di AdaGrad (scaling adattivo per parametro), ottenendo una convergenza rapida e robusta senza richiedere tuning manuale del learning rate. È la scelta standard per confrontare architetture eterogenee con la stessa ricetta di training.
+
+### Scheduling del learning rate
+
+Il learning rate iniziale di Adam non rimane fisso durante il training. Il callback `ReduceLROnPlateau` (definito in `src/training.py`) lo **dimezza automaticamente** ogni volta che `val_loss` non migliora per 7 epoche consecutive, fino a un minimo di `1e-6`:
+
+```python
+keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=7, min_lr=1e-6)
+```
+
+Questo schema — LR alto nelle prime epoche per convergere rapidamente, LR ridotto nelle epoche finali per un fine-tuning più preciso — è visibile nelle curve di training: dopo il plateau iniziale si osserva una discesa più lenta ma stabile della loss verso il minimo.
+
+La loss di training è **MSE** (Mean Squared Error), coerente con la metrica di valutazione principale RMSE (che ne è la radice quadrata).
 
 ---
 

@@ -22,6 +22,8 @@ def build_lstm(
     x = keras.layers.LSTM(units // 2)(x)
     x = keras.layers.Dropout(dropout)(x)
 
+    # ReLU introduce non-linearità: senza attivazione, layer densi in sequenza
+    # collasserebbero in una sola trasformazione lineare, incapace di modellare il degrado
     x = keras.layers.Dense(64, activation="relu")(x)
     # Uscita lineare (nessuna attivazione): task di regressione, RUL può essere
     # qualsiasi valore positivo → non vincoliamo l'output
