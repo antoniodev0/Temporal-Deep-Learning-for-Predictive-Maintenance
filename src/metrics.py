@@ -32,19 +32,36 @@ def evaluate(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 
 
 def evaluate_by_rul_range(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
-    # Analisi per fascia di RUL: capisce dove il modello sbaglia di più
-    # 0-50: fase critica (vicini al guasto), 50-100: transizione, 100-125: fase sana cappata
-    ranges = {"0-50": (0, 50), "50-100": (50, 100), "100-125": (100, 125)}
+    """Analisi per fascia di RUL: capisce dove il modello sbaglia di più.
+
+    Fasce (intervalli half-open per evitare doppio conteggio ai bordi):
+      - "0-50"   : [0, 50)   fase critica — motori vicini al guasto
+      - "50-100" : [50, 100) fase di transizione — degrado in corso
+      - "100-125": [100, 125] fase sana cappata — RUL intorno al cap di 125
+
+    Restituisce per ogni fascia: mae, rmse, nasa_score, n (supporto statistico).
+    La somma di n sulle 3 fasce è uguale al numero totale di motori nel test set.
+    """
+    # (lo, hi, closed_right): se closed_right=True usa <=, altrimenti <
+    ranges = {
+        "0-50":    (0,   50,  False),
+        "50-100":  (50,  100, False),
+        "100-125": (100, 125, True),
+    }
     results = {}
-    for label, (lo, hi) in ranges.items():
-        # Maschera booleana per isolare i campioni nella fascia [lo, hi]
-        mask = (y_true >= lo) & (y_true <= hi)
-        if mask.sum() == 0:
-            results[label] = {"mae": None, "rmse": None, "n": 0}
+    for label, (lo, hi, closed) in ranges.items():
+        if closed:
+            mask = (y_true >= lo) & (y_true <= hi)
+        else:
+            mask = (y_true >= lo) & (y_true < hi)
+        n = int(mask.sum())
+        if n == 0:
+            results[label] = {"mae": None, "rmse": None, "nasa_score": None, "n": 0}
         else:
             results[label] = {
-                "mae": mae(y_true[mask], y_pred[mask]),
-                "rmse": rmse(y_true[mask], y_pred[mask]),
-                "n": int(mask.sum()),
+                "mae":       mae(y_true[mask], y_pred[mask]),
+                "rmse":      rmse(y_true[mask], y_pred[mask]),
+                "nasa_score": nasa_score(y_true[mask], y_pred[mask]),
+                "n":         n,
             }
     return results

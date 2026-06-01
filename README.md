@@ -61,7 +61,9 @@ In **FD001 e FD003** (1 condizione operativa) questi valori sono quasi costanti 
 
 ### Strategia di etichettatura RUL
 
-Si adotta la **RUL lineare a tratti** (piecewise linear / clipped): la RUL massima viene cappata a 125 cicli, assumendo che il motore sia in stato sano nella prima parte della sua vita. Questo è lo standard della letteratura e migliora significativamente le prestazioni.
+Si adotta la **RUL lineare a tratti** (piecewise linear / clipped): la RUL massima viene cappata a 125 cicli, assumendo che il motore sia in stato sano nella prima parte della sua vita. Questo è lo standard della letteratura e migliora significativamente le prestazioni. Il primo tratto va dal ciclo 1 al ciclo 75 ed è una linea orizzontale piatta a quota 125. Il motore è considerato "sano" e la sua RUL assegnata non scende.
+Il secondo tratto va dal ciclo 75 al ciclo 200 ed è una retta che scende da 125 fino a 0, esattamente come prima.
+Il punto di giunzione tra i due tratti — il ciclo 75 in questo esempio — è il momento in cui la RUL reale tocca 125 per la prima volta, da lì in poi le due curve coincidono.
 
 ### Selezione delle feature
 
