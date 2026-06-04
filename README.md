@@ -337,7 +337,7 @@ Ogni punto rappresenta un motore del test set. L'asse X è la RUL reale (da `RUL
 - **LSTM su FD001 e FD003**: i punti sono ben allineati alla diagonale, con dispersione ridotta. Il modello è sia accurato sia calibrato: non tende sistematicamente a sovra- o sottostimare.
 - **LSTM su FD002 e FD004**: maggiore dispersione attorno alla diagonale, coerente con l'RMSE più alto. La distribuzione degli errori appare comunque bilanciata: errori precoci e tardivi sono presenti in misura simile.
 - **Transformer su FD001, FD002, FD003**: scatter simile all'LSTM, con punti distribuiti attorno alla diagonale senza bias evidenti.
-- **Transformer su FD004**: il grafico è chiaramente peggiore degli altri. Si notano diversi punti con RUL reale bassa (0–50 cicli) ma RUL predetta alta (80–120 cicli) — esattamente le predizioni tardive che il NASA Score penalizza in modo esponenziale. Questo spiega il NASA Score di 2.369.435 (contro 7.771 dell'LSTM): un numero relativamente piccolo di predizioni gravemente tardive domina il risultato.
+- **Transformer su FD004**: il grafico è chiaramente peggiore degli altri. Si notano diversi punti con RUL reale bassa (0–50 cicli) ma RUL predetta alta (80–120 cicli) — esattamente le predizioni tardive che il NASA Score penalizza in modo esponenziale.
 
 ---
 
@@ -457,37 +457,6 @@ score = sum(exp(-d/13) - 1  se d < 0   ← predizione anticipata
 ```
 
 Penalizza le **predizioni tardive** (sovrastimare la RUL rimasta) più severamente di quelle precoci. Riflette il costo reale asimmetrico: predire un guasto troppo tardi causa danni al motore, predirlo troppo presto causa manutenzione inutile. Punteggio più basso = migliore.
-
----
-
-## Risultati
-
-### Confronto Principale (Esperimento 1)
-
-| Modello     | FD001 RMSE | FD002 RMSE | FD003 RMSE | FD004 RMSE |
-|-------------|-----------|-----------|-----------|-----------|
-| LSTM        | **14.82** | **29.29** | 15.61     | **28.70** |
-| Transformer | 15.50     | 29.45     | **15.26** | 39.36     |
-
-| Modello     | FD001 MAE | FD002 MAE | FD003 MAE | FD004 MAE |
-|-------------|-----------|-----------|-----------|-----------|
-| LSTM        | 10.92     | 19.03     | 11.71     | **20.41** |
-| Transformer | 11.75     | **18.44** | **11.47** | 23.97     |
-
-| Modello     | FD001 Score | FD002 Score | FD003 Score | FD004 Score |
-|-------------|------------|------------|------------|------------|
-| LSTM        | **387**    | **59.884** | **393**    | **7.771**  |
-| Transformer | 489        | 367.973    | 407        | 2.369.435  |
-
-*Valori in grassetto = migliore per colonna. NASA Score: più basso è meglio.*
-
-### Analisi per Fascia di RUL — MAE (Esperimento 3)
-
-| Fascia RUL | LSTM MAE (FD001) | Transformer MAE (FD001) |
-|------------|-----------------|------------------------|
-| 0–50       | **3.93**        | 4.42                   |
-| 50–100     | **16.43**       | 18.00                  |
-| 100–125    | **7.25**        | 9.37                   |
 
 ---
 
